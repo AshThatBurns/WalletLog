@@ -1,0 +1,39 @@
+[
+    {
+        "Key": "WalletLog_Table1",
+        "Value": {
+            "entries": [
+                {
+                    "Key": "ID",
+                    "Value": {
+                        "selected": false,
+                        "data": {
+                            "1": {
+                                "IntType": {
+                                    "_int": 0,
+                                    "InitValue": 0,
+                                    "$type": "IntType"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "Key": "DATE",
+                    "Value": {
+                        "selected": false,
+                        "data": {
+                            "1": {
+                                "IntType": {
+                                    "_int": 0,
+                                    "InitValue": 0,
+                                    "$type": "IntType"
+                                }
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    }
+]
