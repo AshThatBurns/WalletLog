@@ -25,6 +25,14 @@ public class SMSReader : MonoBehaviour
     int progress = 0;
     bool isLoading = false;
 
+    /// <summary>
+    /// None: Non-applicable
+    /// Purchase
+    /// TransferOut: "Deducted"
+    /// TransferIn: "Deposited"
+    /// </summary>
+    public enum msgType { None, Purchase, TransferOut, TransferIn }
+
     List<List<string>> msgs;
 
     /// <summary>
@@ -75,6 +83,67 @@ public class SMSReader : MonoBehaviour
 
         // Load SMS Inbox
         StartCoroutine(ImportFromIntent());
+    }
+
+    public void parseBodyText(Sms sms, string body)
+    {
+        msgType currMsgType = msgType.None;
+        Double changeAmt = 0.0;
+        bool Balance_LookForNumber = false;
+        Double balanceAmt = 0.0;
+        bool AED_LookForNumber = false;
+        string beneficiaryName = "";
+        bool lookForName = false;
+
+        string[] words = body.Split(' ');
+        foreach (string w in words)
+        {
+            string word = w.Trim();
+
+            // If looking for the beneficiary name, concatinate words until fullstop is reached
+            if (lookForName)
+            {
+                beneficiaryName += " " + word;
+                if (word.EndsWith(".")) lookForName = false;
+            }
+
+            // Check msg type
+            if (word == "Purchase") { if (currMsgType == msgType.None) currMsgType = msgType.Purchase; }
+            else if (word == "deducted") { if (currMsgType == msgType.None) currMsgType = msgType.TransferOut; }
+            else if (word == "deposited" || word == "credited" || word == "Withdrawal") { if (currMsgType == msgType.None) currMsgType = msgType.TransferIn; }
+            else if (word == "Balance" || word == "balance") Balance_LookForNumber = true;
+            
+            // If word is "at" start looking for beneficiary name
+            else if (word == "at") lookForName = true;
+
+            // If looking for a money value, try checking data type
+            else if (AED_LookForNumber)
+            {
+                if (Balance_LookForNumber)   // Check if we are looking for a balance number
+                {
+                    if (Double.TryParse(word, out balanceAmt))
+                    {
+                        Balance_LookForNumber = false;
+                        AED_LookForNumber = false;
+                    }
+                }
+                else    // just save it as regular change number
+                {
+                    if (Double.TryParse(word, out changeAmt))
+                    {
+                        AED_LookForNumber = false;
+                    }
+                }
+            }
+
+            // If found AED, start looking for a money value
+            else if (word == "AED") AED_LookForNumber = true;
+        }
+
+        sms.setMsgType(currMsgType.ToString());
+        sms.setChangeAmount(changeAmt);
+        sms.setBalance(balanceAmt);
+        sms.setBeneficiaryName(beneficiaryName);
     }
 
     IEnumerator ImportFromIntent()
@@ -162,12 +231,9 @@ public class SMSReader : MonoBehaviour
             // Handle error
         }
 
-
-
         #region Store data in sms objects
-        int msgInfo = msgs[0].Count;
-        Debug.Log(msgs.Count);  // Number of messages
-        Debug.Log(msgInfo);    // Number of categories
+        int msgInfo = msgs[0].Count;    // Number of categories
+        //Debug.Log(msgs.Count);  // Number of messages
 
         progress = 0;
 
@@ -189,7 +255,7 @@ public class SMSReader : MonoBehaviour
                         if (valueType == "_id") sms.setId(value);
                         if (valueType == "address") sms.setAddress(value);
                         if (valueType == "date") sms.setTime(value);
-                        if (valueType == "body") sms.setMsg(value);
+                        if (valueType == "body") parseBodyText(sms, value);
                     }
 
                     // calculate progress
@@ -204,25 +270,16 @@ public class SMSReader : MonoBehaviour
         #endregion
 
         #region Create a table
+
         for (int s = 0; s < 5/*processedMessages.Count-1*/; s++)
         {
-            Debug.Log(
-                processedMessages[s].getId() + " " +
-                processedMessages[s].getAddress() + " " +
-                processedMessages[s].getTime() + " " +
-                processedMessages[s].getMsg());
-
-            GameObject g = Instantiate(tableCellPrefab, tableContent);
-            g.GetComponent<Text>().text = "s " + processedMessages[s].getId();
-            
-            g = Instantiate(tableCellPrefab, tableContent);
-            g.GetComponent<Text>().text = "s " + processedMessages[s].getAddress();
-            
-            g = Instantiate(tableCellPrefab, tableContent);
-            g.GetComponent<Text>().text = "s " + processedMessages[s].getMsg();
-            
-            g = Instantiate(tableCellPrefab, tableContent);
-            g.GetComponent<Text>().text = "s " + processedMessages[s].getTime();
+            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getId();
+            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getAddress();
+            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getTime();
+            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getMsgType();
+            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getChangeAmount().ToString();
+            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getBalance().ToString();
+            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getBeneficiaryName();
         }
         #endregion
 

@@ -2,7 +2,10 @@
 {
     private string _id;
     private string _address;
-    private string _msg;
+    private string _msgType;
+    private double _changeAmt;
+    private double _balance;
+    private string _beneficiaryName;
     private string _readState; //"0" for have not read sms and "1" for have read sms
     private string _time;
     private string _folderName;
@@ -15,15 +18,26 @@
     {
         return _address;
     }
-    public string getMsg()
-    {
-        return _msg;
-    }
     public string getTime()
     {
         return _time;
     }
-
+    public string getMsgType()
+    {
+        return _msgType;
+    }
+    public double getChangeAmount()
+    {
+        return _changeAmt;
+    }
+    public double getBalance()
+    {
+        return _balance;
+    }
+    public string getBeneficiaryName()
+    {
+        return _beneficiaryName;
+    }
 
     public void setId(string id)
     {
@@ -33,13 +47,24 @@
     {
         _address = address;
     }
-    public void setMsg(string msg)
-    {
-        _msg = msg;
-    }
     public void setTime(string time)
     {
         _time = time;
     }
-
+    public void setMsgType(string msgType)
+    {
+        _msgType = msgType;
+    }
+    public void setChangeAmount(double changeAmt)
+    {
+        _changeAmt = changeAmt;
+    }
+    public void setBalance(double balance)
+    {
+        _balance = balance;
+    }
+    public void setBeneficiaryName(string benName)
+    {
+        _beneficiaryName = benName;
+    }
 }
