@@ -19,17 +19,9 @@
     {
         return _msg;
     }
-    public string getReadState()
-    {
-        return _readState;
-    }
     public string getTime()
     {
         return _time;
-    }
-    public string getFolderName()
-    {
-        return _folderName;
     }
 
 
@@ -45,17 +37,9 @@
     {
         _msg = msg;
     }
-    public void setReadState(string readState)
-    {
-        _readState = readState;
-    }
     public void setTime(string time)
     {
         _time = time;
-    }
-    public void setFolderName(string folderName)
-    {
-        _folderName = folderName;
     }
 
 }
