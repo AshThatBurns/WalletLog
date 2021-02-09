@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class SMSReader : MonoBehaviour
 {
-
+    #region VARIABLES
     string[] desiredContacts = { "EmiratesNBD" };
     /// <summary>
     /// 1: _id
@@ -14,7 +15,7 @@ public class SMSReader : MonoBehaviour
     /// 4: date, 
     /// 12: body
     /// </summary>
-    string[] desiredMsgInfo = { "_id", "address", "date", "body" };
+    string[] desiredMsgInfo = { "_id", "address", /*"date",*/ "body" };
     //int[] desiredMsgInfo = { 2, 4, 12};
 
     public GameObject startLoadingPanel;
@@ -22,6 +23,7 @@ public class SMSReader : MonoBehaviour
     public Image loadingBar;
     public Text loadingProgressPercent;
     public GameObject finishLoadingPanel;
+
     int progress = 0;
     bool isLoading = false;
 
@@ -33,17 +35,13 @@ public class SMSReader : MonoBehaviour
     /// </summary>
     public enum msgType { None, Purchase, TransferOut, TransferIn }
 
-    List<List<string>> msgs;
-
     /// <summary>
     /// Order from newest -> oldest
     /// </summary>
-    List<Sms> processedMessages;
-
-    public GameObject tableCellPrefab;
-    public Transform tableContent;
+    //public List<Sms> processedMessages;
 
     public static SMSReader instance;
+    #endregion
 
     private void Awake()
     {
@@ -112,7 +110,7 @@ public class SMSReader : MonoBehaviour
             else if (word == "deducted") { if (currMsgType == msgType.None) currMsgType = msgType.TransferOut; }
             else if (word == "deposited" || word == "credited" || word == "Withdrawal") { if (currMsgType == msgType.None) currMsgType = msgType.TransferIn; }
             else if (word == "Balance" || word == "balance") Balance_LookForNumber = true;
-            
+
             // If word is "at" start looking for beneficiary name
             else if (word == "at") lookForName = true;
 
@@ -140,17 +138,37 @@ public class SMSReader : MonoBehaviour
             else if (word == "AED") AED_LookForNumber = true;
         }
 
-        sms.setMsgType(currMsgType.ToString());
-        sms.setChangeAmount(changeAmt);
-        sms.setBalance(balanceAmt);
-        sms.setBeneficiaryName(beneficiaryName);
+        if (currMsgType == msgType.None)
+            sms._msgType = ("");
+        else
+            sms._msgType = (currMsgType.ToString());
+        sms._changeAmt = (changeAmt);
+        sms._balance = (balanceAmt);
+        sms._beneficiaryName = (beneficiaryName);
+    }
+
+    public DateTime formatDateTime(string value)
+    {
+        //AndroidJavaObject formatter = new AndroidJavaObject("java.text.SimpleDateFormat", "dd/MM/yyyy hh:mm:ss.SSS");
+        AndroidJavaClass calendarClass = new AndroidJavaClass("java.util.Calendar");
+        AndroidJavaObject calendar = calendarClass.CallStatic<AndroidJavaObject>("getInstance");
+
+        long number = long.Parse(value);
+        calendar.Call("setTimeInMillis", number);
+        int day = calendar.Call<int>("get", 5);   //  5 = Calendar.DATE_OF_MONTH
+        int month = calendar.Call<int>("get", 2); //  2 = Calendar.MONTH
+        int year = calendar.Call<int>("get", 1);  //  1 = Calendar.YEAR
+        int hour = calendar.Call<int>("get", 10); // 10 = Calendar.HOUR
+        int mins = calendar.Call<int>("get", 12); // 12 = Calendar.MINUTE
+        int secs = calendar.Call<int>("get", 13); // 12 = Calendar.SECOND
+        int ampm = calendar.Call<int>("get", 9);  //  9 = Calendar.AM_PM
+        //return (day+"/"+month+"/"+year+" "+hour+":"+mins+" "+ampm);
+        return new DateTime(year, month, day, hour, mins, secs);
     }
 
     IEnumerator ImportFromIntent()
     {
         yield return new WaitForSeconds(1f);
-
-
 
         isLoading = true;
         try
@@ -179,20 +197,23 @@ public class SMSReader : MonoBehaviour
                 AndroidJavaObject uriObject = uriClass.CallStatic<AndroidJavaObject>("parse", "content://sms/inbox");
                 AndroidJavaObject cursor = contentResolver.Call<AndroidJavaObject>("query", uriObject, null, null, null, null);
 
-                msgs = new List<List<string>>();
+                SQLManager.instance.StartSync();
+
+                //msgs = new List<List<string>>();
                 if (cursor.Call<bool>("moveToFirst"))
                 {
                     do      // Loop through all messages
                     {
                         bool isDesiredContact = false;
-                        List<string> msgData = new List<string>();
+                        //List<string> msgData = new List<string>();
 
                         int columnCount = cursor.Call<int>("getColumnCount");
+
+                        Sms sms = new Sms();
 
                         // Loop through all elements of current message
                         for (int idx = 0; idx < columnCount; idx++) 
                         {
-
                             bool isDesiredInfo = false;
 
                             // Retrieve type and data
@@ -200,19 +221,34 @@ public class SMSReader : MonoBehaviour
                             string value = cursor.Call<string>("getString", idx);
 
                             // Check if message came from desired contacts
+                            if (valueType == "_id") sms._id = value;
                             if (valueType == "address")
                             {
                                 for (int i = 0; i < desiredContacts.Length; i++)
                                 {
                                     isDesiredContact = value == desiredContacts[i];
+                                    if (isDesiredContact) sms._address = value;
                                 }
                             }
+                            if (valueType == "body") parseBodyText(sms, value);
+                            if (valueType == "date")
+                            {
+                                //1612343119703
+                                //1612345977808
+                                //1612275113595
 
-                            msgData.Add(valueType + ":" + value);
+                                // Attempt to parse date string
+                                //long lon = cursor.Call<long>("getLong", 0);
+
+                                //msgData.Add(valueType + ":" + formatDateTime(value));
+                            }
                         }
 
-                        // Save msgData only if its from a desired contact
-                        if (isDesiredContact) msgs.Add(msgData);
+                        // Save msgData only if its from a desired contact and msg type
+                        if (isDesiredContact && sms._msgType != msgType.None.ToString())
+                        {
+                            SQLManager.instance.CreateNewEntry(sms);
+                        }
 
                     } while (cursor.Call<bool>("moveToNext"));
                 }
@@ -231,13 +267,25 @@ public class SMSReader : MonoBehaviour
             // Handle error
         }
 
-        #region Store data in sms objects
+        //processedMessages = convertStringListToSMSList(msgs);
+        //msgs.Clear();
+
+        // Generate table contents
+        ResultsTable.instance.GenerateResultsTable(SQLManager.instance.ds._connection.Query<Sms>("Select * from Sms Limit ?", 20));
+
+        loadingProgressPanel.SetActive(false);
+        finishLoadingPanel.SetActive(true);
+
+        isLoading = false;
+        yield return null;
+    }
+
+    /*List<Sms> convertStringListToSMSList(List<List<string>> msgs)
+    {
         int msgInfo = msgs[0].Count;    // Number of categories
         //Debug.Log(msgs.Count);  // Number of messages
 
-        progress = 0;
-
-        processedMessages = new List<Sms>();
+        //processedMessages = new List<Sms>();
 
         for (int i = 0; i < msgs.Count - 1; i++)    // Loop through messages
         {
@@ -246,48 +294,28 @@ public class SMSReader : MonoBehaviour
             {
                 string[] items = msgs[i][j].Split(':');
                 string valueType = items[0].Trim();
-                string value = items[1].Trim();
+                string value = items[1];
 
                 for (int k = 0; k < desiredMsgInfo.Length; k++) // loop through desired info
                 {
                     if (valueType == desiredMsgInfo[k])
                     {
-                        if (valueType == "_id") sms.setId(value);
-                        if (valueType == "address") sms.setAddress(value);
-                        if (valueType == "date") sms.setTime(value);
+                        if (valueType == "_id") sms._id = value;
+                        if (valueType == "address") sms._address = (value);
+                        if (valueType == "date")
+                        {
+                            //for (int p = 1; p > items.Length - 1; p++)    // add other pieces together
+                                //value += items[p];
+                            //sms._time = (value);
+                        }
                         if (valueType == "body") parseBodyText(sms, value);
                     }
-
-                    // calculate progress
-                    int totalProgress = msgInfo * msgs.Count * desiredMsgInfo.Length;
-                    int currProgress = i * j * k;
-                    progress = (currProgress / totalProgress) * 100;
                 }
             }
-            processedMessages.Add(sms);
+            if (sms._msgType.Length > 0)
+                processedMessages.Add(sms);
         }
-        msgs.Clear();
-        #endregion
-
-        #region Create a table
-
-        for (int s = 0; s < 5/*processedMessages.Count-1*/; s++)
-        {
-            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getId();
-            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getAddress();
-            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getTime();
-            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getMsgType();
-            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getChangeAmount().ToString();
-            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getBalance().ToString();
-            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = processedMessages[s].getBeneficiaryName();
-        }
-        #endregion
-
-        loadingProgressPanel.SetActive(false);
-        finishLoadingPanel.SetActive(true);
-
-        isLoading = false;
-        yield return null;
-    }
+        return processedMessages;
+    }*/
 
 }

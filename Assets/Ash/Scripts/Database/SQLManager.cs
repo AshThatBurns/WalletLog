@@ -9,8 +9,8 @@ using System.IO;
 
 public class SQLManager : MonoBehaviour
 {
-    
     string dbName = "tempDatabase.db";
+    public DBService ds;
 
     public static SQLManager instance;
 
@@ -19,9 +19,20 @@ public class SQLManager : MonoBehaviour
         instance = this;
     }
 
-    public void SubmitQuery()
+    public void StartSync()
     {
-        //_connection.Query<SMS>(sqlDebugPanel.inputField.text, null);
+        ds = new DBService(dbName);
+        ds.CreateTable();
+    }
+
+    public void CreateNewEntry(Sms sms)
+    {
+        ds.CreateNewEntry(sms);
+    }
+
+    public IEnumerable<Sms> GetSMSFromDatabase(int limit)
+    {
+        return ds.CreateQuery("select * from Sms Limit ?", limit);
     }
 
     public void DumpSMSData()

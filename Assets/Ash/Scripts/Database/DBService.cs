@@ -1,5 +1,6 @@
 ﻿using SQLite4Unity3d;
 using UnityEngine;
+using System;
 #if !UNITY_EDITOR
 using System.Collections;
 using System.IO;
@@ -8,19 +9,7 @@ using System.Collections.Generic;
 
 public class DBService
 {
-    private SQLiteConnection _connection;
-
-    void Start()
-    {
-        
-    }
-
-    public void StartSync(string dbname)
-    {
-        var ds = new DBService(dbname);
-        
-        
-    }
+    public SQLiteConnection _connection;
 
     public DBService(string DatabaseName)
     {
@@ -74,5 +63,21 @@ public class DBService
 #endif
         _connection = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadWrite | SQLiteOpenFlags.Create);
         Debug.Log("Final PATH: " + dbPath);
+    }
+
+    public void CreateTable()
+    {
+        _connection.DropTable<Sms>();
+        _connection.CreateTable<Sms>();
+    }
+
+    public void CreateNewEntry(Sms sms)
+    {
+        _connection.Insert(sms);
+    }
+
+    public IEnumerable<Sms> CreateQuery(string query, int args)
+    {
+        return _connection.Query<Sms>(query, args);
     }
 }

@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -17,9 +18,10 @@ public class SqlDebug : MonoBehaviour
         [HideInInspector] public MoveState destState = MoveState.None;
 
         [HideInInspector] public RectTransform panel;
-        public InputField inputField;
     }
     [SerializeField] public SqlDebugPanel sqlDebugPanel;
+
+    public InputField inputField;
 
     public static SqlDebug instance;
 
@@ -61,4 +63,9 @@ public class SqlDebug : MonoBehaviour
         sqlDebugPanel.moveState = SqlDebugPanel.MoveState.moving;
     }    
 
+    public void SubmitQuery()
+    {
+        ResultsTable.instance.GenerateResultsTable(SQLManager.instance.ds._connection.Query<Sms>(inputField.text, ""));
+        inputField.text = "";
+    }
 }
