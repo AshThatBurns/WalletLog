@@ -6,6 +6,7 @@ using UnityEngine.UI;
 public class ResultsTable : MonoBehaviour
 {
     public GameObject tableCellPrefab;
+    public Transform HeaderContent;
     public Transform tableContent;
 
     public static ResultsTable instance;
@@ -19,6 +20,7 @@ public class ResultsTable : MonoBehaviour
     {
         // delete child objs
         foreach (Transform child in tableContent) Destroy(child.gameObject);
+        foreach (Transform child in HeaderContent) Destroy(child.gameObject);
 
         // Generate category headers
         Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = "Id";

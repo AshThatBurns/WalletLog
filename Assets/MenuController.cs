@@ -23,6 +23,7 @@ public class MenuController : MonoBehaviour
 
     public int defaultPageNumber;
     public GameObject[] pages;
+    public GameObject loadMessagesPanel;
 
     public static MenuController instance;
 
@@ -39,6 +40,7 @@ public class MenuController : MonoBehaviour
 
     private void Start()
     {
+        loadMessagesPanel.SetActive(true);
         goToDefaultPage();
     }
 
