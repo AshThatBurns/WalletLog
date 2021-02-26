@@ -34,7 +34,7 @@ public class ResultsTable : MonoBehaviour
         {
             Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = sms._id;
             Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = sms._address;
-            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = "";
+            Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = sms._dateTime.ToString();
             Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = sms._msgType;
             Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = sms._changeAmt.ToString();
             Instantiate(tableCellPrefab, tableContent).GetComponent<Text>().text = sms._balance.ToString();

@@ -8,14 +8,14 @@ using UnityEngine.UI;
 public class SMSReader : MonoBehaviour
 {
     #region VARIABLES
-    string[] desiredContacts = { "EmiratesNBD" };
+    string[] desiredContacts = { "EmiratesNBD"};
     /// <summary>
     /// 1: _id
     /// 2: address, 
     /// 4: date, 
     /// 12: body
     /// </summary>
-    string[] desiredMsgInfo = { "_id", "address", /*"date",*/ "body" };
+    string[] desiredMsgInfo = { "_id", "address", "date", "body" };
     //int[] desiredMsgInfo = { 2, 4, 12};
 
     public GameObject startLoadingPanel;
@@ -53,6 +53,9 @@ public class SMSReader : MonoBehaviour
     {
         // Show Start Loading Panel
         startLoadingPanel.SetActive(true);
+
+        // Stops phone from sleeping!
+        Screen.sleepTimeout = SleepTimeout.NeverSleep;
     }
 
     // Update is called once per frame
@@ -81,89 +84,6 @@ public class SMSReader : MonoBehaviour
 
         // Load SMS Inbox
         StartCoroutine(ImportFromIntent());
-    }
-
-    public void parseBodyText(Sms sms, string body)
-    {
-        msgType currMsgType = msgType.None;
-        Double changeAmt = 0.0;
-        bool Balance_LookForNumber = false;
-        Double balanceAmt = 0.0;
-        bool AED_LookForNumber = false;
-        string beneficiaryName = "";
-        bool lookForName = false;
-
-        string[] words = body.Split(' ');
-        foreach (string w in words)
-        {
-            string word = w.Trim();
-
-            // If looking for the beneficiary name, concatinate words until fullstop is reached
-            if (lookForName)
-            {
-                beneficiaryName += " " + word;
-                if (word.EndsWith(".")) lookForName = false;
-            }
-
-            // Check msg type
-            if (word == "Purchase") { if (currMsgType == msgType.None) currMsgType = msgType.Purchase; }
-            else if (word == "deducted") { if (currMsgType == msgType.None) currMsgType = msgType.TransferOut; }
-            else if (word == "deposited" || word == "credited" || word == "Withdrawal") { if (currMsgType == msgType.None) currMsgType = msgType.TransferIn; }
-            else if (word == "Balance" || word == "balance") Balance_LookForNumber = true;
-
-            // If word is "at" start looking for beneficiary name
-            else if (word == "at") lookForName = true;
-
-            // If looking for a money value, try checking data type
-            else if (AED_LookForNumber)
-            {
-                if (Balance_LookForNumber)   // Check if we are looking for a balance number
-                {
-                    if (Double.TryParse(word, out balanceAmt))
-                    {
-                        Balance_LookForNumber = false;
-                        AED_LookForNumber = false;
-                    }
-                }
-                else    // just save it as regular change number
-                {
-                    if (Double.TryParse(word, out changeAmt))
-                    {
-                        AED_LookForNumber = false;
-                    }
-                }
-            }
-
-            // If found AED, start looking for a money value
-            else if (word == "AED") AED_LookForNumber = true;
-        }
-
-        if (currMsgType == msgType.None)
-            sms._msgType = ("");
-        else
-            sms._msgType = (currMsgType.ToString());
-        sms._changeAmt = (changeAmt);
-        sms._balance = (balanceAmt);
-        sms._beneficiaryName = (beneficiaryName);
-    }
-
-    public DateTime formatDateTime(string value)
-    {
-        //AndroidJavaObject formatter = new AndroidJavaObject("java.text.SimpleDateFormat", "dd/MM/yyyy hh:mm:ss.SSS");
-        AndroidJavaClass calendarClass = new AndroidJavaClass("java.util.Calendar");
-        AndroidJavaObject calendar = calendarClass.CallStatic<AndroidJavaObject>("getInstance");
-
-        long number = long.Parse(value);
-        calendar.Call("setTimeInMillis", number);
-        int day = calendar.Call<int>("get", 5);   //  5 = Calendar.DATE_OF_MONTH
-        int month = calendar.Call<int>("get", 2); //  2 = Calendar.MONTH
-        int year = calendar.Call<int>("get", 1);  //  1 = Calendar.YEAR
-        int hour = calendar.Call<int>("get", 10); // 10 = Calendar.HOUR
-        int mins = calendar.Call<int>("get", 12); // 12 = Calendar.MINUTE
-        int secs = calendar.Call<int>("get", 13); // 12 = Calendar.SECOND
-        int ampm = calendar.Call<int>("get", 9);  //  9 = Calendar.AM_PM
-        //return (day+"/"+month+"/"+year+" "+hour+":"+mins+" "+ampm);
-        return new DateTime(year, month, day, hour, mins, secs);
     }
 
     IEnumerator ImportFromIntent()
@@ -204,18 +124,20 @@ public class SMSReader : MonoBehaviour
                 {
                     do      // Loop through all messages
                     {
-                        bool isDesiredContact = false;
-                        //List<string> msgData = new List<string>();
-
                         int columnCount = cursor.Call<int>("getColumnCount");
-
                         Sms sms = new Sms();
+
+                        // Check if current message is desired message
+                        bool isDesiredContact = false;
+                        string addr = cursor.Call<string>("getString", 2);
+                        for (int i = 0; i < desiredContacts.Length; i++)    // check if a desired contact
+                            isDesiredContact = addr == desiredContacts[i];
+                        if (!isDesiredContact) continue;   // Continue loop if not a desired contact message
+                        sms._address = addr;
 
                         // Loop through all elements of current message
                         for (int idx = 0; idx < columnCount; idx++) 
                         {
-                            bool isDesiredInfo = false;
-
                             // Retrieve type and data
                             string valueType = cursor.Call<string>("getColumnName", idx).Trim();
                             string value = cursor.Call<string>("getString", idx);
@@ -224,11 +146,7 @@ public class SMSReader : MonoBehaviour
                             if (valueType == "_id") sms._id = value;
                             if (valueType == "address")
                             {
-                                for (int i = 0; i < desiredContacts.Length; i++)
-                                {
-                                    isDesiredContact = value == desiredContacts[i];
-                                    if (isDesiredContact) sms._address = value;
-                                }
+                                continue;
                             }
                             if (valueType == "body") parseBodyText(sms, value);
                             if (valueType == "date")
@@ -236,16 +154,12 @@ public class SMSReader : MonoBehaviour
                                 //1612343119703
                                 //1612345977808
                                 //1612275113595
-
-                                // Attempt to parse date string
-                                //long lon = cursor.Call<long>("getLong", 0);
-
-                                //msgData.Add(valueType + ":" + formatDateTime(value));
+                                formatDateTime(sms, value);
                             }
                         }
 
                         // Save msgData only if its from a desired contact and msg type
-                        if (isDesiredContact && sms._msgType != msgType.None.ToString())
+                        if (isDesiredContact && sms._msgType != "")
                         {
                             SQLManager.instance.CreateNewEntry(sms);
                         }
@@ -267,17 +181,111 @@ public class SMSReader : MonoBehaviour
             // Handle error
         }
 
-        //processedMessages = convertStringListToSMSList(msgs);
-        //msgs.Clear();
-
+        // Go to Results Page
+        MenuController.instance.OpenPageNumber(0);
         // Generate table contents
         ResultsTable.instance.GenerateResultsTable(SQLManager.instance.ds._connection.Query<Sms>("Select * from Sms Limit ?", 20));
 
         loadingProgressPanel.SetActive(false);
-        finishLoadingPanel.SetActive(true);
 
         isLoading = false;
         yield return null;
+
+        // Disable LoadMessagesPanel
+        gameObject.SetActive(false);
+    }
+
+    void parseBodyText(Sms sms, string body)
+    {
+        msgType currMsgType = msgType.None;
+        Double changeAmt = 0.0;
+        bool Balance_LookForNumber = false;
+        Double balanceAmt = 0.0;
+        bool AED_LookForNumber = false;
+        string beneficiaryName = "";
+        bool lookForName = false;
+
+        string[] words = body.Split(' ');
+        foreach (string w in words)
+        {
+            string word = w.Trim();
+
+            // If looking for the beneficiary name, concatinate words until fullstop is reached
+            if (lookForName)
+            {
+                beneficiaryName += " " + word;
+                if (word.EndsWith(".")) lookForName = false;
+            }
+
+            // Check msg type
+            if (word == "Purchase") { if (currMsgType == msgType.None) currMsgType = msgType.Purchase; }
+            else if (word == "deducted") { if (currMsgType == msgType.None) currMsgType = msgType.TransferOut; }
+            else if (word == "deposited" || word == "credited" || word == "Withdrawal") { if (currMsgType == msgType.None) currMsgType = msgType.TransferIn; }
+
+            // If word is "at" start looking for beneficiary name
+            else if (word == "at") lookForName = true;
+
+            // If looking for a money value, try checking data type
+            else if (AED_LookForNumber)
+            {
+                if (Balance_LookForNumber)   // Check if we are looking for a balance number
+                {
+                    string word_no_comma = parseMoneyText(word);
+                    if (Double.TryParse(word_no_comma, out balanceAmt))
+                    {
+                        Balance_LookForNumber = false;
+                        AED_LookForNumber = false;
+                    }
+                }
+                else    // just save it as regular change number
+                {
+                    string word_no_comma = parseMoneyText(word);
+                    if (Double.TryParse(word_no_comma, out changeAmt))
+                    {
+                        AED_LookForNumber = false;
+                    }
+                }
+            }
+
+            // If found AED, start looking for a money value
+            else if (word == "Balance") Balance_LookForNumber = true;
+            else if (word == "AED") AED_LookForNumber = true;
+        }
+
+        if (currMsgType == msgType.None)
+            sms._msgType = ("");
+        else
+            sms._msgType = (currMsgType.ToString());
+        sms._changeAmt = (changeAmt);
+        sms._balance = (balanceAmt);
+        sms._beneficiaryName = (beneficiaryName);
+    }
+
+    string parseMoneyText(string value)
+    {
+        value = value.Replace(",", "");
+        if (value.EndsWith("."))
+            value = value.Remove(value.Length - 1, 1);
+        return value;
+    }
+
+    void formatDateTime(Sms sms, string value)
+    {
+        //AndroidJavaObject formatter = new AndroidJavaObject("java.text.SimpleDateFormat", "dd/MM/yyyy hh:mm:ss.SSS");
+        AndroidJavaClass TimezoneClass = new AndroidJavaClass("java.util.TimeZone");
+        AndroidJavaClass CalendarClass = new AndroidJavaClass("java.util.Calendar");
+        AndroidJavaObject timezone = TimezoneClass.CallStatic<AndroidJavaObject>("getDefault");
+        AndroidJavaObject calendar = CalendarClass.CallStatic<AndroidJavaObject>("getInstance", timezone);
+        calendar.Call("setTimeInMillis", long.Parse(value));
+
+        int day = calendar.Call<int>("get", 5);   //  5 = Calendar.DATE_OF_MONTH
+        int month = calendar.Call<int>("get", 2) + 1; //  2 = Calendar.MONTH
+        int year = calendar.Call<int>("get", 1);  //  1 = Calendar.YEAR
+        int hour = calendar.Call<int>("get", 10); // 10 = Calendar.HOUR
+        int mins = calendar.Call<int>("get", 12); // 12 = Calendar.MINUTE
+        int secs = calendar.Call<int>("get", 13); // 12 = Calendar.SECOND
+        int ampm = calendar.Call<int>("get", 9);  //  9 = Calendar.AM_PM
+        sms._dateTime = new DateTime(year, month, day, hour, mins, secs);
     }
 
     /*List<Sms> convertStringListToSMSList(List<List<string>> msgs)

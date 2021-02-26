@@ -39,6 +39,7 @@ public class SqlDebug : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+
         // Move Debug Panel
         if (sqlDebugPanel.moveState == SqlDebugPanel.MoveState.moving)
         {
@@ -66,6 +67,15 @@ public class SqlDebug : MonoBehaviour
     public void SubmitQuery()
     {
         ResultsTable.instance.GenerateResultsTable(SQLManager.instance.ds._connection.Query<Sms>(inputField.text, ""));
+    }
+
+    public void QueryQuickType(string input)
+    {
+        inputField.text += input;
+    }
+
+    public void QueryClear()
+    {
         inputField.text = "";
     }
 }

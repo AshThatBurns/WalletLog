@@ -9,6 +9,5 @@ public class Sms
     public double _changeAmt { get; set; }
     public double _balance { get; set; }
     public string _beneficiaryName { get; set; }
-    //public string _time { get; set; }
-    //public string _date { get; set; }
+    public DateTime _dateTime { get; set; }
 }
